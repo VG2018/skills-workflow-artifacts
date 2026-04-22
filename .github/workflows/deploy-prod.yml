@@ -1,0 +1,52 @@
+name: Deploy to Production
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: read
+  deployments: write
+
+jobs:
+  approval-gate:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: production
+      # Optional: add approval reviewers
+    steps:
+      - name: Notify approval required
+        run: |
+          echo "Build succeeded. Waiting for production approval..."
+          echo "Workflow run: ${{ github.event.workflow_run.html_url }}"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: approval-gate
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Download build artifact from CI workflow
+        uses: actions/download-artifact@v7
+        with:
+          name: build-artifact
+          path: ./dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify artifact downloaded
+        run: |
+          echo "Artifact downloaded successfully"
+          ls -la ./dist
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add your production deployment commands here
+          # Example: docker push, kubectl apply, etc.
+          echo "Deployment complete"
